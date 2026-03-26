@@ -588,6 +588,7 @@ export default function MeritBadgeQuiz() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
   const [animating, setAnimating] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
   const ref = useRef(null);
   const q = QUESTIONS[step];
   const isUnder13 = answers.age === "10-12";
@@ -613,13 +614,13 @@ export default function MeritBadgeQuiz() {
   }, [step, transition]);
   const handleBack = useCallback(() => { if (step > 0) transition(() => setStep(step - 1)); }, [step, transition]);
 
-  const fetchResults = useCallback(async () => {
+  const fetchResults = useCallback(async (emailOverride) => {
     setScreen("loading"); setError(null);
     try {
       const resp = await fetch("/.netlify/functions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
+        body: JSON.stringify({ answers, email: emailOverride || null }),
       });
       if (!resp.ok) { const e = await resp.text(); console.error("HTTP", resp.status, e); throw new Error("API returned " + resp.status); }
       const data = await resp.json();
@@ -716,19 +717,9 @@ export default function MeritBadgeQuiz() {
         </div>
       )}
 
-      {screen === "email_gate" && <EmailGate isUnder13={isUnder13} onSubmit={async (email) => {
-  try {
-    await fetch('https://api.convertkit.com/v3/forms/YOUR_FORM_ID/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        api_key: 'YOUR_KIT_PUBLIC_API_KEY',
-        email: email,
-        tags: ['merit-badge-quiz'],
-      }),
-    });
-  } catch (err) { console.error('Kit error:', err); }
-  fetchResults();
+      {screen === "email_gate" && <EmailGate isUnder13={isUnder13} onSubmit={(email) => {
+  setUserEmail(email);
+  fetchResults(email);
 }} onSkipForMinor={() => fetchResults()} />}
       {screen === "loading" && <LoadingScreen />}
       {screen === "results" && results && <ResultsScreen results={results} onRetake={handleRetake} />}
@@ -737,7 +728,7 @@ export default function MeritBadgeQuiz() {
           <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 22, fontWeight: 800, color: "#2c3e1f", marginBottom: 10 }}>Hmm, something went wrong</div>
           <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 14, color: "#7a8b6e", marginBottom: 8 }}>{error}</p>
           <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 12, color: "#aaa", marginBottom: 20 }}>This usually means the AI service is temporarily busy. Try again in a moment.</p>
-          <button onClick={() => fetchResults()} style={{ padding: "13px 30px", borderRadius: 10, border: "none",
+          <button onClick={() => fetchResults(userEmail)} style={{ padding: "13px 30px", borderRadius: 10, border: "none",
             background: "#2d7d46", color: "#fff", cursor: "pointer", marginRight: 10,
             fontFamily: "'Nunito Sans', sans-serif", fontSize: 14, fontWeight: 700 }}>Try Again</button>
           <button onClick={handleRetake} style={{ padding: "13px 30px", borderRadius: 10, border: "1.5px solid #d6d3c8",

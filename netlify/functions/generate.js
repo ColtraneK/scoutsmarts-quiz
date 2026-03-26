@@ -67,7 +67,7 @@ export default async (req) => {
   }
 
   try {
-    const { answers } = await req.json();
+    const { answers, email } = await req.json();
 
     if (!answers || typeof answers !== "object") {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
@@ -111,8 +111,79 @@ export default async (req) => {
       });
     }
 
-    // Normalize to Anthropic-style response so the frontend doesn't need changes
     const text = data.choices?.[0]?.message?.content || "";
+
+    // If email provided, send Kit subscriber + Resend results email (fire-and-forget)
+    if (email) {
+      let parsed;
+      try { parsed = JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()); } catch {}
+
+      const sideEffects = [];
+
+      // Add subscriber to Kit (ConvertKit) via v4 API
+      const kitSecret = process.env.CONVERTKIT_API_SECRET;
+      if (kitSecret) {
+        sideEffects.push(
+          fetch("https://api.kit.com/v4/subscribers", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${kitSecret}`,
+            },
+            body: JSON.stringify({ email_address: email }),
+          }).catch(err => console.error("Kit error:", err))
+        );
+      }
+
+      // Send results email via Resend
+      const resendKey = process.env.RESEND_API_KEY;
+      if (resendKey && parsed?.badges) {
+        const badgeRows = parsed.badges.map((b, i) => `
+          <tr>
+            <td style="padding:12px 16px;border-bottom:1px solid #e8e5dc;">
+              <strong style="color:#2c3e1f;font-size:15px;">${i + 1}. ${b.name}</strong>
+              ${b.eagle_required ? '<span style="background:#2d7d46;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;">EAGLE</span>' : ""}
+              <br><span style="color:#7a8b6e;font-size:13px;">${b.match_percent}% match &middot; ${b.category} &middot; ${b.time_estimate}</span>
+              <br><span style="color:#555;font-size:13px;">${b.why}</span>
+              <br><span style="color:#2d7d46;font-size:12px;font-style:italic;">Pro tip: ${b.pro_tip}</span>
+            </td>
+          </tr>`).join("");
+
+        const html = `
+          <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f3eb;padding:32px 24px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <h1 style="color:#2c3e1f;font-size:22px;margin:0;">Your Merit Badge Results</h1>
+              <p style="color:#2d7d46;font-size:18px;margin:8px 0 4px;">${parsed.scout_type || ""}</p>
+              <p style="color:#7a8b6e;font-size:14px;margin:0;">${parsed.personality_description || ""}</p>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;">
+              ${badgeRows}
+            </table>
+            ${parsed.eagle_tip ? `<div style="background:#2d7d46;color:#fff;padding:16px;border-radius:8px;margin-top:16px;font-size:13px;"><strong>Eagle Tip:</strong> ${parsed.eagle_tip}</div>` : ""}
+            <p style="text-align:center;color:#b0b0a0;font-size:11px;margin-top:24px;">Sent by <a href="https://scoutsmarts.com" style="color:#2d7d46;">ScoutSmarts</a></p>
+          </div>`;
+
+        sideEffects.push(
+          fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${resendKey}`,
+            },
+            body: JSON.stringify({
+              from: "Cole from ScoutSmarts <cole@scoutsmarts.com>",
+              to: email,
+              subject: `You're ${parsed.scout_type || "a Scout"} — Your Top 10 Merit Badges`,
+              html,
+            }),
+          }).catch(err => console.error("Resend error:", err))
+        );
+      }
+
+      // Don't block the response on side effects
+      Promise.allSettled(sideEffects).catch(() => {});
+    }
+
     const normalized = { content: [{ type: "text", text }] };
 
     return new Response(JSON.stringify(normalized), {
