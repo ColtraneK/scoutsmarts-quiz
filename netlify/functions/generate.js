@@ -113,16 +113,18 @@ export default async (req) => {
 
     const text = data.choices?.[0]?.message?.content || "";
 
-    // If email provided, send Kit subscriber + Resend results email (fire-and-forget)
+    // If email provided, send Kit subscriber + Resend results email
     if (email) {
       let parsed;
       try { parsed = JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()); } catch {}
 
       const sideEffects = [];
 
-      // Add subscriber to Kit (ConvertKit) via v4 API
+      // Add subscriber to Kit (ConvertKit) via v4 API with custom fields for segmentation
       const kitSecret = process.env.CONVERTKIT_API_SECRET;
       if (kitSecret) {
+        const topBadges = parsed?.badges?.slice(0, 3).map(b => b.name).join(", ") || "";
+        const interests = Array.isArray(answers.interests) ? answers.interests.join(", ") : "";
         sideEffects.push(
           fetch("https://api.kit.com/v4/subscribers", {
             method: "POST",
@@ -130,7 +132,18 @@ export default async (req) => {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${kitSecret}`,
             },
-            body: JSON.stringify({ email_address: email }),
+            body: JSON.stringify({
+              email_address: email,
+              first_name: "",
+              fields: {
+                scout_type: parsed?.scout_type || "",
+                age_range: answers.age || "",
+                interests: interests,
+                top_badges: topBadges,
+                challenge_level: answers.challenge_level || "",
+                environment: answers.environment || "",
+              },
+            }),
           }).catch(err => console.error("Kit error:", err))
         );
       }
@@ -180,8 +193,8 @@ export default async (req) => {
         );
       }
 
-      // Don't block the response on side effects
-      Promise.allSettled(sideEffects).catch(() => {});
+      // Await side effects so Netlify doesn't kill them on function exit
+      await Promise.allSettled(sideEffects);
     }
 
     const normalized = { content: [{ type: "text", text }] };

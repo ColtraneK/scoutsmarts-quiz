@@ -489,7 +489,7 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
   }
   if (isUnder13 && isParent === false) return null;
   const submit = () => {
-    if (!email || !email.includes("@") || !email.includes(".")) { setErr("Please enter a valid email address."); return; }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setErr("Please enter a valid email address."); return; }
     setErr(""); onSubmit(email);
   };
   return (<div style={{ maxWidth: 480, margin: "0 auto", padding: "48px 24px", textAlign: "center",
@@ -509,8 +509,8 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
         color: "#fff", cursor: "pointer", fontFamily: "'Nunito Sans', sans-serif", fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>Send Results</button>
     </div>
     {err && <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#c0392b" }}>{err}</p>}
-    <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 11, color: "#aaa", marginTop: 12 }}>
-      No spam, ever. Just Scouting tips from ScoutSmarts.</p>
+    <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 11, color: "#aaa", marginTop: 12, lineHeight: 1.5 }}>
+      By entering your email you agree to receive your results and occasional Scouting tips from ScoutSmarts. No spam, ever. Unsubscribe anytime.</p>
   </div>);
 }
 
