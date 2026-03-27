@@ -593,6 +593,7 @@ export default function MeritBadgeQuiz() {
   const q = QUESTIONS[step];
   const isUnder13 = answers.age === "10-12";
   const scrollTop = useCallback(() => { ref.current?.scrollTo({ top: 0, behavior: "smooth" }); }, []);
+  useEffect(() => { window.scrollTo(0, 0); if (ref.current) ref.current.scrollTop = 0; }, []);
   const transition = useCallback((fn) => {
     setAnimating(true);
     setTimeout(() => { fn(); scrollTop(); setTimeout(() => setAnimating(false), 50); }, 220);
