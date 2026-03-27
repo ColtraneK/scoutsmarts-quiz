@@ -366,7 +366,7 @@ function LoadingScreen() {
   const pct = Math.min(((elapsed / 65) * 100), active === steps.length - 1 ? 95 : ((active + 1) / steps.length) * 100);
 
   return (
-    <div className="quiz-container" style={{ maxWidth: 560, margin: "0 auto", padding: "48px 24px" }}>
+    <div className="quiz-container" style={{ maxWidth: 420, margin: "0 auto", padding: "48px 24px" }}>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 22, fontWeight: 800, color: "#2c3e1f", marginBottom: 4 }}>
           Finding your perfect badges...</div>
@@ -474,7 +474,7 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
   const [isParent, setIsParent] = useState(null);
   const [err, setErr] = useState("");
   if (isUnder13 && isParent === null) {
-    return (<div className="quiz-container" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px", textAlign: "center",
+    return (<div className="quiz-container" style={{ maxWidth: 480, margin: "0 auto", padding: "48px 24px", textAlign: "center",
       opacity: 0, animation: "fadeUp 0.4s ease forwards" }}>
       <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 24, fontWeight: 800, color: "#2c3e1f", marginBottom: 10 }}>One quick question!</div>
       <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 15, color: "#5a6b4e", lineHeight: 1.6, marginBottom: 28 }}>
@@ -492,14 +492,14 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setErr("Please enter a valid email address."); return; }
     setErr(""); onSubmit(email);
   };
-  return (<div className="quiz-container" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px", textAlign: "center",
+  return (<div className="quiz-container" style={{ maxWidth: 480, margin: "0 auto", padding: "48px 24px", textAlign: "center",
     opacity: 0, animation: "fadeUp 0.4s ease forwards" }}>
     <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 24, fontWeight: 800, color: "#2c3e1f", marginBottom: 10 }}>Almost there!</div>
     <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 15, color: "#5a6b4e", lineHeight: 1.6, marginBottom: 24 }}>
       {isParent
         ? "Enter your email and we will send your Scout's personalized badge recommendations. That way you will have them saved even if you lose this page."
         : "Enter your email and we will send your personalized results. That way you will have them saved even if you close this tab."}</p>
-    <div style={{ display: "flex", gap: 10, maxWidth: 480, margin: "0 auto 12px" }}>
+    <div style={{ display: "flex", gap: 10, maxWidth: 400, margin: "0 auto 12px" }}>
       <input type="email" value={email} onChange={e => setEmail(e.target.value)}
         onKeyDown={e => e.key === "Enter" && submit()}
         placeholder={isParent ? "parent@email.com" : "you@email.com"}
@@ -516,14 +516,14 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
 
 function ResultsScreen({ results, onRetake }) {
   return (
-    <div className="quiz-container" style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px 60px" }}>
+    <div className="quiz-container" style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 60px" }}>
       <div style={{ textAlign: "center", marginBottom: 28, paddingTop: 8, opacity: 0, animation: "fadeUp 0.5s ease forwards" }}>
         <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 12, fontWeight: 800,
           color: "#2d7d46", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 8 }}>Your Scout Personality</div>
         <h2 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 32, fontWeight: 900,
           color: "#2c3e1f", margin: "0 0 12px", lineHeight: 1.2 }}>{results.scout_type}</h2>
         <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 15, color: "#4a5a3e",
-          lineHeight: 1.65, maxWidth: 640, margin: "0 auto" }}>{results.personality_description}</p>
+          lineHeight: 1.65, maxWidth: 480, margin: "0 auto" }}>{results.personality_description}</p>
       </div>
       <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 20, fontWeight: 800,
         color: "#2c3e1f", marginBottom: 12, opacity: 0, animation: "fadeUp 0.5s ease forwards", animationDelay: "0.1s" }}>
@@ -646,13 +646,14 @@ export default function MeritBadgeQuiz() {
   const isLast = step === QUESTIONS.length - 1;
 
   return (
-    <div ref={ref} style={{ minHeight: "100vh", overflowY: "auto", background: `#f5f3eb url("${TOPO_BG}") repeat` }}>
+    <div ref={ref} className="quiz-root" style={{ minHeight: "100vh", overflowY: "auto", background: `#f5f3eb url("${TOPO_BG}") repeat` }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700;6..12,800;6..12,900&display=swap');
         @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
         @keyframes spin { to { transform:rotate(360deg); } }
         * { box-sizing: border-box; } input::placeholder { color: #b0b0a0; }
-        @media (max-width: 600px) { .quiz-container { max-width: 100% !important; padding-left: 16px !important; padding-right: 16px !important; } }
+        @media (min-width: 768px) { .quiz-root { zoom: 1.33; } }
+        @media (max-width: 767px) { .quiz-container { max-width: 100% !important; padding-left: 16px !important; padding-right: 16px !important; } }
       `}</style>
       <div style={{ padding: "12px 20px", borderBottom: "1px solid #e0ddd4",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -664,13 +665,13 @@ export default function MeritBadgeQuiz() {
       </div>
 
       {screen === "intro" && (
-        <div className="quiz-container" style={{ maxWidth: 690, margin: "0 auto", padding: "44px 24px", textAlign: "center", opacity: 0, animation: "fadeUp 0.5s ease forwards" }}>
+        <div className="quiz-container" style={{ maxWidth: 520, margin: "0 auto", padding: "44px 24px", textAlign: "center", opacity: 0, animation: "fadeUp 0.5s ease forwards" }}>
           <div style={{ display: "inline-block", padding: "4px 14px", borderRadius: 20, background: "rgba(45,125,70,0.1)",
             fontFamily: "'Nunito Sans', sans-serif", fontSize: 12, fontWeight: 700, color: "#2d7d46",
             textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Merit Badge Finder</div>
-          <h1 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 42, fontWeight: 900, color: "#2c3e1f", margin: "0 0 14px", lineHeight: 1.2 }}>
+          <h1 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 34, fontWeight: 900, color: "#2c3e1f", margin: "0 0 14px", lineHeight: 1.2 }}>
             What Merit Badge Should You Earn Next?</h1>
-          <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 16, color: "#4a5a3e", lineHeight: 1.7, maxWidth: 580, margin: "0 auto 28px" }}>
+          <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 16, color: "#4a5a3e", lineHeight: 1.7, maxWidth: 440, margin: "0 auto 28px" }}>
             Answer 10 quick questions about your interests, personality, and goals.
             We will match you with the 10 best merit badges for you, plus insider tips on how to earn each one.</p>
           <div style={{ display: "flex", gap: 24, justifyContent: "center", marginBottom: 32,
@@ -688,11 +689,11 @@ export default function MeritBadgeQuiz() {
       )}
 
       {screen === "quiz" && (
-        <div className="quiz-container" style={{ maxWidth: 690, margin: "0 auto", padding: "28px 24px",
+        <div className="quiz-container" style={{ maxWidth: 520, margin: "0 auto", padding: "28px 24px",
           opacity: animating ? 0 : 1, transform: animating ? "translateY(10px)" : "translateY(0)",
           transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)" }}>
           <ProgressBar current={step} total={QUESTIONS.length} />
-          <h2 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 28, fontWeight: 800, color: "#2c3e1f", margin: "0 0 4px", lineHeight: 1.25 }}>{q.question}</h2>
+          <h2 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 22, fontWeight: 800, color: "#2c3e1f", margin: "0 0 4px", lineHeight: 1.25 }}>{q.question}</h2>
           {q.subtitle && <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#7a8b6e", margin: "0 0 20px" }}>{q.subtitle}</p>}
           {!q.subtitle && <div style={{ height: 20 }} />}
           {q.type === "age_range" && <AgeRangeQ options={q.options} value={answers[q.id]} onChange={handleAnswer} />}
