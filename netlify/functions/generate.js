@@ -199,6 +199,106 @@ export default async (req) => {
 
     const normalized = { content: [{ type: "text", text }] };
 
+    // Parse results once — used for both Resend and Supabase
+    let results = null;
+    try {
+      results = JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+    } catch (parseErr) {
+      console.error("Failed to parse OpenAI JSON:", parseErr);
+    }
+
+    // Fire Resend + Supabase in parallel, neither blocks the response
+    await Promise.allSettled([
+
+      // --- Resend email ---
+      (async () => {
+        if (!email || !results || !process.env.RESEND_API_KEY) return;
+        const badgeRows = (results.badges || []).map((b, i) => `
+          <tr>
+            <td style="padding:12px 16px;border-bottom:1px solid #f0ede4;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-weight:800;color:#2d7d46;font-size:15px;">${i + 1}.</span>
+                <div>
+                  <div style="font-weight:700;color:#2c3e1f;font-size:15px;">${b.name}${b.eagle_required ? ' <span style="color:#f5b731;font-size:12px;">★ Eagle</span>' : ''}</div>
+                  <div style="font-size:12px;color:#7a8b6e;margin-top:2px;">${b.category} &bull; Difficulty ${b.difficulty}/10 &bull; ${b.time_estimate} &bull; ${b.match_percent}% match</div>
+                  <div style="font-size:13px;color:#444;margin-top:4px;">${b.why}</div>
+                  <div style="font-size:12px;color:#2d7d46;margin-top:4px;font-style:italic;">Pro tip: ${b.pro_tip}</div>
+                </div>
+              </div>
+            </td>
+          </tr>`).join("");
+
+        const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f3eb;font-family:'Helvetica Neue',Arial,sans-serif;">
+<div style="max-width:600px;margin:0 auto;padding:32px 16px;">
+  <div style="text-align:center;margin-bottom:24px;">
+    <img src="https://scoutsmarts.com/wp-content/uploads/2019/11/PNG-Transparent-300x224.png" alt="ScoutSmarts" style="height:48px;" />
+  </div>
+  <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.07);">
+    <div style="background:linear-gradient(135deg,#2d7d46,#3a9b5c);padding:28px 24px;text-align:center;">
+      <div style="font-size:13px;color:rgba(255,255,255,0.8);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Your Scout Type</div>
+      <div style="font-size:26px;font-weight:900;color:#fff;">${results.scout_type || "The Scout"}</div>
+    </div>
+    <div style="padding:20px 24px;background:#fffdf7;border-bottom:1px solid #f0ede4;">
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.6;">${results.personality_description || ""}</p>
+    </div>
+    <div style="padding:16px 24px 8px;">
+      <div style="font-size:11px;font-weight:800;color:#7a8b6e;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Your Top 10 Merit Badge Matches</div>
+    </div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${badgeRows}</table>
+    ${results.eagle_tip ? `
+    <div style="margin:16px 24px;padding:14px 16px;background:#fffbee;border-radius:10px;border-left:3px solid #f5b731;">
+      <div style="font-size:11px;font-weight:800;color:#d4a020;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Eagle Tip</div>
+      <div style="font-size:13px;color:#444;">${results.eagle_tip}</div>
+    </div>` : ""}
+    <div style="padding:20px 24px;text-align:center;border-top:1px solid #f0ede4;">
+      <a href="https://scoutsmarts.com" style="display:inline-block;padding:12px 28px;background:#2d7d46;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Explore ScoutSmarts Guides</a>
+    </div>
+  </div>
+  <p style="text-align:center;font-size:11px;color:#aaa;margin-top:20px;">ScoutSmarts &bull; Built by an Eagle Scout &bull; <a href="https://scoutsmarts.com" style="color:#aaa;">scoutsmarts.com</a></p>
+</div>
+</body></html>`;
+
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "Cole at ScoutSmarts <cole@scoutsmarts.com>",
+            to: [email],
+            subject: `Your merit badge matches are here, ${results.scout_type || "Scout"}!`,
+            html,
+          }),
+        });
+      })(),
+
+      // --- Supabase logging ---
+      (async () => {
+        if (!results || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return;
+        await fetch(`${process.env.SUPABASE_URL}/rest/v1/quiz_completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": process.env.SUPABASE_SERVICE_KEY,
+            "Authorization": `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+            "Prefer": "return=minimal",
+          },
+          body: JSON.stringify({
+            email: email || null,
+            scout_type: results.scout_type || null,
+            personality_description: results.personality_description || null,
+            badges: results.badges || [],
+            eagle_tip: results.eagle_tip || null,
+            answers,
+            age_range: answers.age || null,
+          }),
+        });
+      })(),
+
+    ]);
+
     return new Response(JSON.stringify(normalized), {
       status: 200,
       headers: {
