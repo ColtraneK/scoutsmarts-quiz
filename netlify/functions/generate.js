@@ -259,24 +259,33 @@ export default async (req) => {
         const topBadges = results.badges?.slice(0, 3).map(b => b.name).join(", ") || "";
 
         // Subscribe to quiz form if newsletter or series opt-in (triggers confirmation email)
+        // Only subscribe non-active subscribers to avoid re-sending the confirmation email
         if (optIns.newsletter || optIns.series) {
-          const formRes = await fetch("https://api.convertkit.com/v3/forms/9269203/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              api_secret: secret,
-              email,
-              fields: {
-                scout_type: results.scout_type || "",
-                age_range: answers.age || "",
-                interests: Array.isArray(answers.interests) ? answers.interests.join(", ") : "",
-                top_badges: topBadges,
-                challenge_level: answers.challenge_level || "",
-                environment: answers.environment || "",
-              },
-            }),
-          });
-          if (!formRes.ok) console.error("Kit form subscribe failed:", formRes.status, await formRes.text());
+          const checkRes = await fetch(
+            `https://api.convertkit.com/v3/subscribers?api_secret=${secret}&email_address=${encodeURIComponent(email)}`
+          );
+          const checkJson = checkRes.ok ? await checkRes.json() : {};
+          const alreadyActive = checkJson.subscribers?.[0]?.state === "active";
+
+          if (!alreadyActive) {
+            const formRes = await fetch("https://api.convertkit.com/v3/forms/9269203/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                api_secret: secret,
+                email,
+                fields: {
+                  scout_type: results.scout_type || "",
+                  age_range: answers.age || "",
+                  interests: Array.isArray(answers.interests) ? answers.interests.join(", ") : "",
+                  top_badges: topBadges,
+                  challenge_level: answers.challenge_level || "",
+                  environment: answers.environment || "",
+                },
+              }),
+            });
+            if (!formRes.ok) console.error("Kit form subscribe failed:", formRes.status, await formRes.text());
+          }
         }
 
         // Series opt-in tag — Kit visual automation fires after subscriber confirms
