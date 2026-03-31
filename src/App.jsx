@@ -525,8 +525,7 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
   const [email, setEmail] = useState("");
   const [isParent, setIsParent] = useState(null);
   const [err, setErr] = useState("");
-  const [optNewsletter, setOptNewsletter] = useState(false);
-  const [optSeries, setOptSeries] = useState(false);
+
   if (isUnder13 && isParent === null) {
     return (<div className="quiz-container" style={{ maxWidth: 480, margin: "0 auto", padding: "48px 24px", textAlign: "center",
       opacity: 0, animation: "fadeUp 0.4s ease forwards" }}>
@@ -544,7 +543,7 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
   if (isUnder13 && isParent === false) return null;
   const submit = () => {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { setErr("Please enter a valid email address."); return; }
-    setErr(""); onSubmit(email, { newsletter: optNewsletter, series: optSeries });
+    setErr(""); onSubmit(email);
   };
   return (<div className="quiz-container" style={{ maxWidth: 480, margin: "0 auto", padding: "48px 24px", textAlign: "center",
     opacity: 0, animation: "fadeUp 0.4s ease forwards" }}>
@@ -563,24 +562,8 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
         color: "#fff", cursor: "pointer", fontFamily: "'Nunito Sans', sans-serif", fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>Send Results</button>
     </div>
     {err && <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#c0392b" }}>{err}</p>}
-    <div style={{ maxWidth: 400, margin: "14px auto 0", display: "flex", flexDirection: "column", gap: 10, textAlign: "left" }}>
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-        <input type="checkbox" checked={optNewsletter} onChange={e => setOptNewsletter(e.target.checked)}
-          style={{ marginTop: 2, width: 16, height: 16, accentColor: "#2d7d46", cursor: "pointer", flexShrink: 0 }} />
-        <span style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#4a5a3e", lineHeight: 1.5 }}>
-          Sign me up for the ScoutSmarts newsletter — badge tips, Eagle strategies, and Scouting guides.
-        </span>
-      </label>
-      <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
-        <input type="checkbox" checked={optSeries} onChange={e => setOptSeries(e.target.checked)}
-          style={{ marginTop: 2, width: 16, height: 16, accentColor: "#2d7d46", cursor: "pointer", flexShrink: 0 }} />
-        <span style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#4a5a3e", lineHeight: 1.5 }}>
-          Enroll me in the free ScoutSmarts Series — a step-by-step guide to Eagle Scout.
-        </span>
-      </label>
-    </div>
     <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 11, color: "#aaa", marginTop: 12, lineHeight: 1.5 }}>
-      Your email is used to send your results. No spam, ever. Unsubscribe anytime.</p>
+      No spam, ever. Unsubscribe anytime.</p>
   </div>);
 }
 
@@ -685,13 +668,13 @@ export default function MeritBadgeQuiz() {
   }, [step, transition]);
   const handleBack = useCallback(() => { if (step > 0) transition(() => setStep(step - 1)); }, [step, transition]);
 
-  const fetchResults = useCallback(async (emailOverride, optIns) => {
+  const fetchResults = useCallback(async (emailOverride) => {
     setScreen("loading"); setError(null);
     try {
       const resp = await fetch("/.netlify/functions/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers, email: emailOverride || null, optIns: optIns || {} }),
+        body: JSON.stringify({ answers, email: emailOverride || null }),
       });
       if (!resp.ok) { const e = await resp.text(); console.error("HTTP", resp.status, e); throw new Error("API returned " + resp.status); }
       const data = await resp.json();
@@ -790,9 +773,9 @@ export default function MeritBadgeQuiz() {
         </div>
       )}
 
-      {screen === "email_gate" && <EmailGate isUnder13={isUnder13} onSubmit={(email, optIns) => {
+      {screen === "email_gate" && <EmailGate isUnder13={isUnder13} onSubmit={(email) => {
   setUserEmail(email);
-  fetchResults(email, optIns);
+  fetchResults(email);
 }} onSkipForMinor={() => fetchResults()} />}
       {screen === "loading" && <LoadingScreen />}
       {screen === "results" && results && <ResultsScreen results={results} onRetake={handleRetake} />}
