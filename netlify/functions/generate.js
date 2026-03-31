@@ -200,7 +200,7 @@ export default async (req) => {
   }
 
   try {
-    const { answers, email } = await req.json();
+    const { answers, email, optIns = {} } = await req.json();
 
     if (!answers || typeof answers !== "object") {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
@@ -258,36 +258,44 @@ export default async (req) => {
         const secret = process.env.CONVERTKIT_API_SECRET;
         const topBadges = results.badges?.slice(0, 3).map(b => b.name).join(", ") || "";
 
-        // Subscribe to quiz form with custom fields
-        const formRes = await fetch("https://api.convertkit.com/v3/forms/9269203/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_secret: secret,
-            email,
-            fields: {
-              scout_type: results.scout_type || "",
-              age_range: answers.age || "",
-              interests: Array.isArray(answers.interests) ? answers.interests.join(", ") : "",
-              top_badges: topBadges,
-              challenge_level: answers.challenge_level || "",
-              environment: answers.environment || "",
-            },
-          }),
-        });
-        if (!formRes.ok) {
-          console.error("Kit form subscribe failed:", formRes.status, await formRes.text());
+        // Subscribe to quiz form if newsletter or series opt-in (triggers confirmation email)
+        if (optIns.newsletter || optIns.series) {
+          const formRes = await fetch("https://api.convertkit.com/v3/forms/9269203/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              api_secret: secret,
+              email,
+              fields: {
+                scout_type: results.scout_type || "",
+                age_range: answers.age || "",
+                interests: Array.isArray(answers.interests) ? answers.interests.join(", ") : "",
+                top_badges: topBadges,
+                challenge_level: answers.challenge_level || "",
+                environment: answers.environment || "",
+              },
+            }),
+          });
+          if (!formRes.ok) console.error("Kit form subscribe failed:", formRes.status, await formRes.text());
         }
 
-        // Tag as quiz completer
-        const tagRes = await fetch("https://api.convertkit.com/v3/tags/18445554/subscribe", {
+        // Series opt-in tag — Kit visual automation fires after subscriber confirms
+        if (optIns.series) {
+          const seriesRes = await fetch("https://api.convertkit.com/v3/tags/18445583/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ api_secret: secret, email }),
+          });
+          if (!seriesRes.ok) console.error("Kit series tag failed:", seriesRes.status, await seriesRes.text());
+        }
+
+        // Always tag as quiz completer
+        const completerRes = await fetch("https://api.convertkit.com/v3/tags/18445554/subscribe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ api_secret: secret, email }),
         });
-        if (!tagRes.ok) {
-          console.error("Kit tag failed:", tagRes.status, await tagRes.text());
-        }
+        if (!completerRes.ok) console.error("Kit completer tag failed:", completerRes.status, await completerRes.text());
       })(),
 
       // Resend results email
