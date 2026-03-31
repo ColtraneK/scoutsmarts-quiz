@@ -58,5 +58,3 @@ There are 136 active BSA merit badges in the database.
 - Side effects (Kit + Resend) are `await`ed before response returns
 - CSS `zoom: 1.33` on desktop (768px+) for larger default layout
 - Time estimates start at "1-2 weekends" (not "A weekend" — unrealistic)
-- Removed discontinued/fake badges: American Indian Culture, Health Care Professions, Scuba Diving
-- "Small-Boat Sailing" uses official BSA hyphenation

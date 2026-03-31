@@ -361,8 +361,12 @@ export default async (req) => {
 
       // Supabase logging
       (async () => {
-        if (!results || !process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return;
-        await fetch(`${process.env.SUPABASE_URL}/rest/v1/quiz_completions`, {
+        if (!results) return;
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+          console.error("Supabase env vars not set — skipping log");
+          return;
+        }
+        const sbRes = await fetch(`${process.env.SUPABASE_URL}/rest/v1/quiz_completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -380,6 +384,10 @@ export default async (req) => {
             age_range: answers.age || null,
           }),
         });
+        if (!sbRes.ok) {
+          const body = await sbRes.text();
+          console.error("Supabase insert failed:", sbRes.status, body);
+        }
       })(),
 
     ]);
