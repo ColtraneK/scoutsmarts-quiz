@@ -215,15 +215,20 @@ function validateAnswers(a) {
 // ── Main handler ───────────────────────────────────────────────────────────────
 export default async (req) => {
   const origin = req.headers.get("origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : null;
+  // Block only when Origin is explicitly set to an unknown domain.
+  // No Origin header = same-origin browser request or non-browser — allow it.
+  const originBlocked = origin && !ALLOWED_ORIGINS.has(origin);
+  const corsOrigin = ALLOWED_ORIGINS.has(origin)
+    ? origin
+    : "https://merit-badge-quiz.scoutsmarts.com";
 
   // CORS preflight
   if (req.method === "OPTIONS") {
-    if (!allowedOrigin) return new Response(null, { status: 403 });
+    if (originBlocked) return new Response(null, { status: 403 });
     return new Response(null, {
       status: 204,
       headers: {
-        "Access-Control-Allow-Origin": allowedOrigin,
+        "Access-Control-Allow-Origin": corsOrigin,
         "Access-Control-Allow-Methods": "POST",
         "Access-Control-Allow-Headers": "Content-Type",
       },
@@ -236,7 +241,7 @@ export default async (req) => {
     });
   }
 
-  if (!allowedOrigin) {
+  if (originBlocked) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403, headers: { "Content-Type": "application/json" },
     });
@@ -462,7 +467,7 @@ export default async (req) => {
 
     return new Response(JSON.stringify(normalized), {
       status: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": allowedOrigin },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin },
     });
 
   } catch (err) {
@@ -473,4 +478,4 @@ export default async (req) => {
   }
 };
 
-export const config = { method: "POST" };
+export const config = { method: ["POST", "OPTIONS"] };

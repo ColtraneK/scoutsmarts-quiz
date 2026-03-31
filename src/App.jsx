@@ -608,9 +608,13 @@ export default function MeritBadgeQuiz() {
   }, [answers, q, step, transition]);
 
   const handleContinue = useCallback(() => {
+    // Bake in slider default if user never touched it
+    if (q?.type === "slider" && answers[q.id] === undefined && q.defaultValue !== undefined) {
+      setAnswers(prev => ({ ...prev, [q.id]: q.defaultValue }));
+    }
     if (step < QUESTIONS.length - 1) transition(() => setStep(step + 1));
     else setScreen("email_gate");
-  }, [step, transition]);
+  }, [step, transition, q, answers]);
   const handleBack = useCallback(() => { if (step > 0) transition(() => setStep(step - 1)); }, [step, transition]);
 
   const fetchResults = useCallback(async (emailOverride) => {
@@ -623,7 +627,7 @@ export default function MeritBadgeQuiz() {
       });
       if (!resp.ok) { const e = await resp.text(); console.error("HTTP", resp.status, e); throw new Error("API returned " + resp.status); }
       const data = await resp.json();
-      if (data.error) { console.error("API error:", data.error); throw new Error(data.error.message || "API error"); }
+      if (data.error) { console.error("API error:", data.error); throw new Error(data.error?.message ?? data.error ?? "API error"); }
       const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
       if (!text) throw new Error("Empty response");
       const parsed = JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
@@ -638,7 +642,7 @@ export default function MeritBadgeQuiz() {
     if (!q) return false; const val = answers[q.id];
     if (q.type === "multi_select") return Array.isArray(val) && val.length > 0;
     if (q.type === "ranking") return Array.isArray(val) && val.length > 0;
-    if (q.type === "slider") return val !== undefined;
+    if (q.type === "slider") return val !== undefined || q.defaultValue !== undefined;
     return val !== undefined;
   })();
   const needsBtn = q?.type === "multi_select" || q?.type === "slider" || q?.type === "ranking";
