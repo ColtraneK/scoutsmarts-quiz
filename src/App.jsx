@@ -63,10 +63,10 @@ const QUESTIONS = [
   { id: "saturday_pick", type: "image_pick",
     question: "It's Saturday morning with nothing planned. What sounds best?",
     options: [
-      { label: "Hit the trail", value: "outdoors", icon: "mountain" },
-      { label: "Build something", value: "maker", icon: "hammer" },
-      { label: "Learn something new", value: "learner", icon: "book" },
-      { label: "Get competitive", value: "competitive", icon: "trophy" },
+      { label: "Hit the trail", value: "outdoors", icon: "mountain", tint: "rgba(45,125,70,0.06)" },
+      { label: "Build something", value: "maker", icon: "hammer", tint: "rgba(160,90,30,0.06)" },
+      { label: "Learn something new", value: "learner", icon: "book", tint: "rgba(30,120,180,0.06)" },
+      { label: "Get competitive", value: "competitive", icon: "trophy", tint: "rgba(245,183,49,0.07)" },
     ],
   },
   { id: "environment", type: "single",
@@ -271,10 +271,11 @@ function AgeRangeQ({ options, value, onChange }) {
 }
 function ImagePickQ({ options, value, onChange }) {
   return (<div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-    {options.map(o => { const Icon = ICON_MAP[o.icon]; return (<button key={o.value} onClick={() => onChange(o.value)} style={{
-      padding: "18px 10px", borderRadius: 14, border: value === o.value ? "2px solid #2d7d46" : "1.5px solid #d6d3c8",
-      background: value === o.value ? "rgba(45,125,70,0.07)" : "#fff", cursor: "pointer",
-      display: "flex", flexDirection: "column", alignItems: "center", gap: 8, transition: "all 0.2s ease",
+    {options.map(o => { const Icon = ICON_MAP[o.icon]; const selected = value === o.value; return (<button key={o.value} onClick={() => onChange(o.value)} style={{
+      padding: "18px 10px", borderRadius: 14,
+      border: selected ? "2px solid #2d7d46" : "1.5px solid #d6d3c8",
+      background: selected ? "rgba(45,125,70,0.12)" : (o.tint || "#fff"),
+      cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, transition: "all 0.2s ease",
     }}><Icon /><span style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, fontWeight: 600,
       color: "#2c3e1f", textAlign: "center" }}>{o.label}</span></button>); })}</div>);
 }
@@ -310,7 +311,15 @@ function MultiSelectQ({ options, value, onChange }) {
       background: on ? "rgba(45,125,70,0.07)" : "#fff", cursor: "pointer",
       fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#2c3e1f",
       fontWeight: on ? 600 : 400, transition: "all 0.2s ease", lineHeight: 1.3,
-    }}>{on ? "* " : ""}{o.label}</button>); })}</div>);
+      display: "flex", alignItems: "flex-start", gap: 8,
+    }}>
+      <span style={{ width: 17, height: 17, borderRadius: "50%", flexShrink: 0, marginTop: 1,
+        background: on ? "#2d7d46" : "transparent", border: `2px solid ${on ? "#2d7d46" : "#d6d3c8"}`,
+        display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s ease" }}>
+        {on && <svg viewBox="0 0 10 8" width="9" height="7"><polyline points="1,4 3.5,6.5 9,1" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+      </span>
+      <span style={{ flex: 1 }}>{o.label}</span>
+    </button>); })}</div>);
 }
 function SliderQ({ question, value, onChange }) {
   return (<div>
@@ -512,7 +521,42 @@ function EmailGate({ isUnder13, onSubmit, onSkipForMinor }) {
   </div>);
 }
 
-function ResultsScreen({ results, onRetake }) {
+function ResultsScreen({ results, onRetake, answers }) {
+  const [extraBadges, setExtraBadges] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(null);
+  const [moreLoaded, setMoreLoaded] = useState(false);
+
+  const loadMore = async () => {
+    setMoreLoaded(true);
+    setLoadingMore(true);
+    setLoadMoreError(null);
+    try {
+      const resp = await fetch("/.netlify/functions/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answers,
+          email: null,
+          excludeBadges: results.badges.map(b => b.name),
+          isLoadMore: true,
+        }),
+      });
+      if (!resp.ok) throw new Error("API returned " + resp.status);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error?.message ?? data.error ?? "API error");
+      const text = data.content?.filter(b => b.type === "text").map(b => b.text).join("") || "";
+      if (!text) throw new Error("Empty response");
+      const parsed = JSON.parse(text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+      if (!parsed.badges || !Array.isArray(parsed.badges)) throw new Error("Invalid format");
+      setExtraBadges(parsed.badges);
+    } catch (e) {
+      setLoadMoreError(e.message || "Something went wrong.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   return (
     <div className="quiz-container" style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 60px" }}>
       <div style={{ textAlign: "center", marginBottom: 28, paddingTop: 8, opacity: 0, animation: "fadeUp 0.5s ease forwards" }}>
@@ -529,6 +573,49 @@ function ResultsScreen({ results, onRetake }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {results.badges.map((b, i) => <BadgeCard key={b.name} badge={b} index={i} />)}
       </div>
+      {/* ── Load more badges ── */}
+      {!moreLoaded && !extraBadges && (
+        <div style={{ background: "linear-gradient(135deg,rgba(45,125,70,0.06),rgba(58,155,92,0.04))",
+          border: "1.5px solid rgba(45,125,70,0.2)", borderRadius: 14, padding: "22px 22px", marginBottom: 16,
+          textAlign: "center", opacity: 0, animation: "fadeUp 0.4s ease forwards", animationDelay: "0.65s" }}>
+          <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 16, fontWeight: 800, color: "#2c3e1f", marginBottom: 6 }}>
+            Already earned some of these badges?</div>
+          <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#5a6b4e", lineHeight: 1.6, margin: "0 0 14px" }}>
+            You're a super Scout! Click below to get 10 more great merit badge matches.</p>
+          <button onClick={loadMore} style={{ padding: "11px 26px", borderRadius: 10, border: "none",
+            background: "#2d7d46", color: "#fff", cursor: "pointer",
+            fontFamily: "'Nunito Sans', sans-serif", fontSize: 14, fontWeight: 700 }}>
+            Get My Next 10 Badges &#8594;</button>
+        </div>
+      )}
+      {loadingMore && (
+        <div style={{ textAlign: "center", padding: "28px 0", marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, border: "3px solid #e0ddd4", borderTop: "3px solid #2d7d46",
+            borderRadius: "50%", animation: "spin 0.7s linear infinite", margin: "0 auto 10px" }} />
+          <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#7a8b6e" }}>
+            Finding your next 10 matches...</div>
+        </div>
+      )}
+      {loadMoreError && (
+        <div style={{ background: "rgba(192,57,43,0.05)", border: "1.5px solid rgba(192,57,43,0.15)",
+          borderRadius: 12, padding: "16px 20px", marginBottom: 16, textAlign: "center" }}>
+          <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#c0392b", margin: "0 0 10px" }}>
+            {loadMoreError}</p>
+          <button onClick={loadMore} style={{ padding: "9px 20px", borderRadius: 8, border: "none",
+            background: "#c0392b", color: "#fff", cursor: "pointer",
+            fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, fontWeight: 700 }}>Try Again</button>
+        </div>
+      )}
+      {extraBadges && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 20, fontWeight: 800,
+            color: "#2c3e1f", marginBottom: 12 }}>Your Next 10 Matches</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {extraBadges.map((b, i) => <BadgeCard key={b.name} badge={b} index={i} />)}
+          </div>
+        </div>
+      )}
+
       {results.eagle_tip && (
         <div style={{ background: "rgba(245,183,49,0.06)", border: "1.5px solid rgba(245,183,49,0.2)",
           borderRadius: 12, padding: "18px 20px", marginBottom: 24,
@@ -585,16 +672,20 @@ export default function MeritBadgeQuiz() {
   const [answers, setAnswers] = useState({});
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
-  const [animating, setAnimating] = useState(false);
+  const [quizAnimClass, setQuizAnimClass] = useState("");
   const [userEmail, setUserEmail] = useState(null);
   const ref = useRef(null);
   const q = QUESTIONS[step];
   const isUnder13 = answers.age === "10-12";
   const scrollTop = useCallback(() => { ref.current?.scrollTo({ top: 0, behavior: "smooth" }); }, []);
   useEffect(() => { window.scrollTo(0, 0); if (ref.current) ref.current.scrollTop = 0; }, []);
-  const transition = useCallback((fn) => {
-    setAnimating(true);
-    setTimeout(() => { fn(); scrollTop(); setTimeout(() => setAnimating(false), 50); }, 220);
+  const transition = useCallback((fn, dir = "forward") => {
+    setQuizAnimClass(dir === "forward" ? "slide-out-left" : "slide-out-right");
+    setTimeout(() => {
+      fn(); scrollTop();
+      setQuizAnimClass(dir === "forward" ? "slide-in-right" : "slide-in-left");
+      setTimeout(() => setQuizAnimClass(""), 300);
+    }, 200);
   }, [scrollTop]);
 
   const handleAnswer = useCallback((val) => {
@@ -615,7 +706,7 @@ export default function MeritBadgeQuiz() {
     if (step < QUESTIONS.length - 1) transition(() => setStep(step + 1));
     else setScreen("email_gate");
   }, [step, transition, q, answers]);
-  const handleBack = useCallback(() => { if (step > 0) transition(() => setStep(step - 1)); }, [step, transition]);
+  const handleBack = useCallback(() => { if (step > 0) transition(() => setStep(step - 1), "back"); }, [step, transition]);
 
   const fetchResults = useCallback(async (emailOverride) => {
     setScreen("loading"); setError(null);
@@ -654,6 +745,14 @@ export default function MeritBadgeQuiz() {
         @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,400;6..12,500;6..12,600;6..12,700;6..12,800;6..12,900&display=swap');
         @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
         @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes slideOutLeft { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(-24px); } }
+        @keyframes slideOutRight { from { opacity:1; transform:translateX(0); } to { opacity:0; transform:translateX(24px); } }
+        @keyframes slideInRight { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:translateX(0); } }
+        @keyframes slideInLeft { from { opacity:0; transform:translateX(-24px); } to { opacity:1; transform:translateX(0); } }
+        .slide-out-left { animation: slideOutLeft 0.2s ease both; }
+        .slide-out-right { animation: slideOutRight 0.2s ease both; }
+        .slide-in-right { animation: slideInRight 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+        .slide-in-left { animation: slideInLeft 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
         * { box-sizing: border-box; } input::placeholder { color: #b0b0a0; }
         @media (min-width: 768px) { .quiz-root { zoom: 1.33; } }
         @media (max-width: 767px) { .quiz-container { max-width: 100% !important; padding-left: 16px !important; padding-right: 16px !important; } }
@@ -692,9 +791,7 @@ export default function MeritBadgeQuiz() {
       )}
 
       {screen === "quiz" && (
-        <div className="quiz-container" style={{ maxWidth: 520, margin: "0 auto", padding: "28px 24px",
-          opacity: animating ? 0 : 1, transform: animating ? "translateY(10px)" : "translateY(0)",
-          transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)" }}>
+        <div className={`quiz-container ${quizAnimClass}`} style={{ maxWidth: 520, margin: "0 auto", padding: "28px 24px" }}>
           <ProgressBar current={step} total={QUESTIONS.length} />
           <h2 style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 22, fontWeight: 800, color: "#2c3e1f", margin: "0 0 4px", lineHeight: 1.25 }}>{q.question}</h2>
           {q.subtitle && <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#7a8b6e", margin: "0 0 20px" }}>{q.subtitle}</p>}
@@ -727,7 +824,7 @@ export default function MeritBadgeQuiz() {
   fetchResults(email);
 }} onSkipForMinor={() => fetchResults()} />}
       {screen === "loading" && <LoadingScreen />}
-      {screen === "results" && results && <ResultsScreen results={results} onRetake={handleRetake} />}
+      {screen === "results" && results && <ResultsScreen results={results} onRetake={handleRetake} answers={answers} />}
       {screen === "error" && (
         <div style={{ textAlign: "center", padding: "60px 24px" }}>
           <div style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 22, fontWeight: 800, color: "#2c3e1f", marginBottom: 10 }}>Hmm, something went wrong</div>

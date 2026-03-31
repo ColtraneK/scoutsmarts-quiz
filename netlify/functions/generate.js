@@ -212,6 +212,25 @@ function validateAnswers(a) {
   return true;
 }
 
+// Returns true if the email looks fake — skip Resend to protect deliverability.
+// Kit and Supabase still run so we don't lose the data.
+function isLikelyFakeEmail(email) {
+  if (!email || typeof email !== "string") return true;
+  const atIdx = email.indexOf("@");
+  if (atIdx < 1) return true;
+  const local = email.slice(0, atIdx).toLowerCase();
+  // Too short (e.g. c@, ab@, abc@)
+  if (local.length < 4) return true;
+  // All same character (e.g. dddddddddd@, aaaa@)
+  if (/^(.)\1+$/.test(local)) return true;
+  // Dominant single character: one char makes up ≥80% of local part
+  const counts = {};
+  for (const ch of local) counts[ch] = (counts[ch] || 0) + 1;
+  const maxCount = Math.max(...Object.values(counts));
+  if (maxCount / local.length >= 0.8) return true;
+  return false;
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────────
 export default async (req) => {
   const origin = req.headers.get("origin") || "";
@@ -248,7 +267,7 @@ export default async (req) => {
   }
 
   try {
-    const { answers, email } = await req.json();
+    const { answers, email, excludeBadges, isLoadMore } = await req.json();
 
     if (!validateAnswers(answers)) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
@@ -273,7 +292,9 @@ export default async (req) => {
         max_tokens: 4096,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: JSON.stringify(answers) },
+          { role: "user", content: Array.isArray(excludeBadges) && excludeBadges.length
+            ? `${JSON.stringify(answers)}\n\nIMPORTANT: Do NOT recommend any of these badges (already shown to this scout): ${excludeBadges.join(", ")}. Recommend 10 entirely different badges.`
+            : JSON.stringify(answers) },
         ],
       }),
     });
@@ -298,11 +319,12 @@ export default async (req) => {
     }
 
     // ── Side effects: Kit, Resend, Supabase — all in parallel ───────────────
-    await Promise.allSettled([
+    if (!isLoadMore) await Promise.allSettled([
 
       // Kit subscriber (v3 API)
       (async () => {
         if (!email || !results || !process.env.CONVERTKIT_API_SECRET) return;
+        if (isLikelyFakeEmail(email)) return;
         const secret = process.env.CONVERTKIT_API_SECRET;
         const topBadges = results.badges?.slice(0, 3).map(b => b.name).join(", ") || "";
 
@@ -345,6 +367,10 @@ export default async (req) => {
       // Resend results email
       (async () => {
         if (!email || !results || !process.env.RESEND_API_KEY) return;
+        if (isLikelyFakeEmail(email)) {
+          console.log("Skipping Resend — likely fake email:", email);
+          return;
+        }
 
         const articles = pickArticles(answers);
 
