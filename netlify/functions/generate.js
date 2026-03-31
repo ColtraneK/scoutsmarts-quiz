@@ -252,15 +252,19 @@ export default async (req) => {
     // ── Side effects: Kit, Resend, Supabase — all in parallel ───────────────
     await Promise.allSettled([
 
-      // Kit subscriber
+      // Kit subscriber (v3 API)
       (async () => {
         if (!email || !results || !process.env.CONVERTKIT_API_SECRET) return;
+        const secret = process.env.CONVERTKIT_API_SECRET;
         const topBadges = results.badges?.slice(0, 3).map(b => b.name).join(", ") || "";
-        await fetch("https://api.kit.com/v4/subscribers", {
+
+        // Subscribe to quiz form with custom fields
+        const formRes = await fetch("https://api.convertkit.com/v3/forms/9269203/subscribe", {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.CONVERTKIT_API_SECRET}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            email_address: email,
+            api_secret: secret,
+            email,
             fields: {
               scout_type: results.scout_type || "",
               age_range: answers.age || "",
@@ -271,6 +275,19 @@ export default async (req) => {
             },
           }),
         });
+        if (!formRes.ok) {
+          console.error("Kit form subscribe failed:", formRes.status, await formRes.text());
+        }
+
+        // Tag as quiz completer
+        const tagRes = await fetch("https://api.convertkit.com/v3/tags/18445554/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_secret: secret, email }),
+        });
+        if (!tagRes.ok) {
+          console.error("Kit tag failed:", tagRes.status, await tagRes.text());
+        }
       })(),
 
       // Resend results email

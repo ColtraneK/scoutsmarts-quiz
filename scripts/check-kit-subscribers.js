@@ -28,8 +28,7 @@ const emails = [
 
 for (const email of emails) {
   const res = await fetch(
-    `https://api.kit.com/v4/subscribers?email_address=${encodeURIComponent(email)}`,
-    { headers: { Authorization: `Bearer ${KIT_SECRET}`, "Content-Type": "application/json" } }
+    `https://api.convertkit.com/v3/subscribers?api_secret=${KIT_SECRET}&email_address=${encodeURIComponent(email)}`
   );
   const json = await res.json();
   if (!res.ok) {
