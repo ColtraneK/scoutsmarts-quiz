@@ -1,5 +1,55 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+const BADGE_GUIDES = {
+  "American Cultures": "https://scoutsmarts.com/american-cultures-merit-badge-guide/",
+  "Archery": "https://scoutsmarts.com/archery-merit-badge-guide/",
+  "Art": "https://scoutsmarts.com/art-merit-badge-guide/",
+  "Backpacking": "https://scoutsmarts.com/backpacking-merit-badge-guide/",
+  "Basketry": "https://scoutsmarts.com/basketry-merit-badge-guide/",
+  "Camping": "https://scoutsmarts.com/camping-merit-badge-guide/",
+  "Chemistry": "https://scoutsmarts.com/chemistry-merit-badge-guide/",
+  "Chess": "https://scoutsmarts.com/chess-merit-badge-guide/",
+  "Citizenship in the Community": "https://scoutsmarts.com/citizenship-in-the-community-merit-badge-guide/",
+  "Citizenship in the Nation": "https://scoutsmarts.com/citizenship-in-the-nation-merit-badge-guide/",
+  "Citizenship in Society": "https://scoutsmarts.com/citizenship-in-society-merit-badge-guide/",
+  "Citizenship in the World": "https://scoutsmarts.com/citizenship-in-the-world-merit-badge-guide/",
+  "Climbing": "https://scoutsmarts.com/climbing-merit-badge-guide/",
+  "Communication": "https://scoutsmarts.com/communication-merit-badge-guide/",
+  "Cooking": "https://scoutsmarts.com/cooking-merit-badge-guide/",
+  "Crime Prevention": "https://scoutsmarts.com/crime-prevention-merit-badge-guide/",
+  "Cycling": "https://scoutsmarts.com/cycling-merit-badge-guide/",
+  "Digital Technology": "https://scoutsmarts.com/digital-technology-merit-badge-guide/",
+  "Emergency Preparedness": "https://scoutsmarts.com/emergency-preparedness-merit-badge-guide/",
+  "Environmental Science": "https://scoutsmarts.com/environmental-science-merit-badge-guide/",
+  "Exploration": "https://scoutsmarts.com/exploration-merit-badge-guide/",
+  "Family Life": "https://scoutsmarts.com/family-life-merit-badge-guide/",
+  "Fingerprinting": "https://scoutsmarts.com/fingerprinting-merit-badge-guide/",
+  "Fire Safety": "https://scoutsmarts.com/fire-safety-merit-badge-guide/",
+  "First Aid": "https://scoutsmarts.com/first-aid-merit-badge-guide/",
+  "Fishing": "https://scoutsmarts.com/fishing-merit-badge-guide/",
+  "Geocaching": "https://scoutsmarts.com/geocaching-merit-badge-guide/",
+  "Hiking": "https://scoutsmarts.com/hiking-merit-badge-guide/",
+  "Indian Lore": "https://scoutsmarts.com/indian-lore-merit-badge-guide/",
+  "Lifesaving": "https://scoutsmarts.com/lifesaving-merit-badge-guide/",
+  "Mammal Study": "https://scoutsmarts.com/mammal-study-merit-badge-guide/",
+  "Oceanography": "https://scoutsmarts.com/oceanography-merit-badge-guide/",
+  "Orienteering": "https://scoutsmarts.com/orienteering-merit-badge-guide/",
+  "Painting": "https://scoutsmarts.com/painting-merit-badge-guide/",
+  "Personal Fitness": "https://scoutsmarts.com/personal-fitness-merit-badge-guide/",
+  "Personal Management": "https://scoutsmarts.com/personal-management-merit-badge-guide-2025/",
+  "Photography": "https://scoutsmarts.com/photography-merit-badge-guide/",
+  "Programming": "https://scoutsmarts.com/programming-merit-badge-guide/",
+  "Public Health": "https://scoutsmarts.com/public-health-merit-badge-guide/",
+  "Rifle Shooting": "https://scoutsmarts.com/rifle-shooting-merit-badge-guide/",
+  "Salesmanship": "https://scoutsmarts.com/salesmanship-merit-badge-guide/",
+  "Scholarship": "https://scoutsmarts.com/scholarship-merit-badge-guide/",
+  "Space Exploration": "https://scoutsmarts.com/space-exploration-merit-badge-guide/",
+  "Sustainability": "https://scoutsmarts.com/sustainability-merit-badge-guide/",
+  "Swimming": "https://scoutsmarts.com/swimming-merit-badge-guide/",
+  "Weather": "https://scoutsmarts.com/weather-merit-badge-guide/",
+  "Wilderness Survival": "https://scoutsmarts.com/wilderness-survival-merit-badge-guide/",
+};
+
 const SYSTEM_PROMPT = `You are Cole, the founder of ScoutSmarts (scoutsmarts.com), an Eagle Scout who earned the rank in 2014. You are THE expert on all 140 BSA merit badges.
 
 COMPLETE MERIT BADGE DATABASE:
@@ -458,11 +508,13 @@ function BadgeCard({ badge, index }) {
             <p style={{ fontFamily: "'Nunito Sans', sans-serif", fontSize: 13, color: "#3a4a2e",
               lineHeight: 1.5, margin: "5px 0 0" }}>{badge.pro_tip}</p>
           </div>
-          <a href={`https://scoutsmarts.com/${badge.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+$/, "")}-merit-badge-guide/`}
-            target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-            style={{ display: "inline-block", marginTop: 4, fontFamily: "'Nunito Sans', sans-serif",
-              fontSize: 13, fontWeight: 700, color: "#2d7d46", textDecoration: "underline", textUnderlineOffset: 3 }}>
-            Read the full ScoutSmarts guide</a>
+          {BADGE_GUIDES[badge.name] && (
+            <a href={BADGE_GUIDES[badge.name]}
+              target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+              style={{ display: "inline-block", marginTop: 4, fontFamily: "'Nunito Sans', sans-serif",
+                fontSize: 13, fontWeight: 700, color: "#2d7d46", textDecoration: "underline", textUnderlineOffset: 3 }}>
+              Read the full ScoutSmarts guide</a>
+          )}
         </div>
       )}
     </div>
