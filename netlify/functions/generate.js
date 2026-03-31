@@ -191,18 +191,61 @@ Respond ONLY with a JSON object (no markdown, no backticks, no preamble):
 
 Recommend exactly 10 badges sorted by match_percent (75-98). Be opinionated and specific.`;
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = new Set([
+  "https://merit-badge-quiz.scoutsmarts.com",
+  "http://localhost:5173",
+  "http://localhost:8888",
+]);
+
+const VALID_AGES        = new Set(["10-12", "13-15", "16-17", "18+"]);
+const VALID_ENVS        = new Set(["wilderness", "water", "workshop", "urban", "anywhere"]);
+const VALID_CHALLENGES  = new Set(["easy", "medium", "hard"]);
+
+function validateAnswers(a) {
+  if (!a || typeof a !== "object")           return false;
+  if (!VALID_AGES.has(a.age))                return false;
+  if (!VALID_ENVS.has(a.environment))        return false;
+  if (!VALID_CHALLENGES.has(a.challenge_level)) return false;
+  if (!Array.isArray(a.interests) || a.interests.length === 0) return false;
+  if (!Array.isArray(a.priorities) || a.priorities.length === 0) return false;
+  return true;
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────────
 export default async (req) => {
+  const origin = req.headers.get("origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : null;
+
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    if (!allowedOrigin) return new Response(null, { status: 403 });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": allowedOrigin,
+        "Access-Control-Allow-Methods": "POST",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405, headers: { "Content-Type": "application/json" },
     });
   }
 
+  if (!allowedOrigin) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403, headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const { answers, email } = await req.json();
 
-    if (!answers || typeof answers !== "object") {
+    if (!validateAnswers(answers)) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
         status: 400, headers: { "Content-Type": "application/json" },
       });
@@ -368,7 +411,7 @@ export default async (req) => {
 </div>
 </body></html>`;
 
-        await fetch("https://api.resend.com/emails", {
+        const sendRes = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.RESEND_API_KEY}` },
           body: JSON.stringify({
@@ -378,6 +421,10 @@ export default async (req) => {
             html,
           }),
         });
+        if (!sendRes.ok) {
+          const body = await sendRes.text();
+          console.error("Resend failed:", sendRes.status, body);
+        }
       })(),
 
       // Supabase logging
@@ -415,7 +462,7 @@ export default async (req) => {
 
     return new Response(JSON.stringify(normalized), {
       status: 200,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": allowedOrigin },
     });
 
   } catch (err) {
