@@ -3,6 +3,16 @@
 // Required env vars: OPENAI_API_KEY, RESEND_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_KEY
 // Optional env vars: CONVERTKIT_API_SECRET
 
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── Badge guide URLs (only badges with actual guides on scoutsmarts.com) ──────
 const BADGE_GUIDES = {
   "American Cultures": "https://scoutsmarts.com/american-cultures-merit-badge-guide/",
@@ -189,7 +199,7 @@ Respond ONLY with a JSON object (no markdown, no backticks, no preamble):
   "eagle_tip": "1-2 sentences of personalized Eagle advice. No em dashes or en dashes."
 }
 
-Recommend exactly 10 badges sorted by match_percent (75-98). Be opinionated and specific.`;
+Recommend exactly 10 badges sorted by match_percent descending. Each badge MUST have a unique match_percent. Use specific non-round numbers (e.g., 94, 87, 81, 76 — NEVER generic multiples of 5 like 95, 90, 85, 80). Spread them realistically across the 75-97 range based on how strongly each badge actually matches the scout's answers. Be opinionated and specific.`;
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = new Set([
@@ -302,8 +312,8 @@ export default async (req) => {
     const data = await resp.json();
     if (!resp.ok) {
       console.error("OpenAI error:", data);
-      return new Response(JSON.stringify({ error: data.error?.message || "OpenAI error" }), {
-        status: resp.status, headers: { "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Something went wrong generating your results. Please try again." }), {
+        status: 502, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": corsOrigin },
       });
     }
 
@@ -376,9 +386,10 @@ export default async (req) => {
 
         const badgeRows = (results.badges || []).map((b, i) => {
           const guideUrl = BADGE_GUIDES[b.name];
+          const safeName = escapeHtml(b.name);
           const nameHtml = guideUrl
-            ? `<a href="${guideUrl}" style="color:#2c3e1f;text-decoration:none;font-weight:700;font-size:15px;">${b.name} &rarr;</a>`
-            : `<span style="font-weight:700;color:#2c3e1f;font-size:15px;">${b.name}</span>`;
+            ? `<a href="${guideUrl}" style="color:#2c3e1f;text-decoration:none;font-weight:700;font-size:15px;">${safeName} &rarr;</a>`
+            : `<span style="font-weight:700;color:#2c3e1f;font-size:15px;">${safeName}</span>`;
           return `
           <tr>
             <td style="padding:14px 20px;border-bottom:1px solid #f0ede4;">
@@ -386,9 +397,9 @@ export default async (req) => {
                 <span style="font-weight:800;color:#2d7d46;font-size:14px;min-width:20px;">${i + 1}.</span>
                 <div style="flex:1;">
                   ${nameHtml}${b.eagle_required ? ' <span style="background:#2d7d46;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;vertical-align:middle;">EAGLE</span>' : ""}
-                  <div style="font-size:12px;color:#7a8b6e;margin-top:3px;">${b.category} &bull; Difficulty ${b.difficulty}/10 &bull; ${b.time_estimate} &bull; ${b.match_percent}% match</div>
-                  <div style="font-size:13px;color:#555;margin-top:5px;line-height:1.5;">${b.why}</div>
-                  <div style="font-size:12px;color:#2d7d46;margin-top:4px;font-style:italic;">Pro tip: ${b.pro_tip}</div>
+                  <div style="font-size:12px;color:#7a8b6e;margin-top:3px;">${escapeHtml(b.category)} &bull; Difficulty ${parseInt(b.difficulty) || 0}/10 &bull; ${escapeHtml(b.time_estimate)} &bull; ${parseInt(b.match_percent) || 0}% match</div>
+                  <div style="font-size:13px;color:#555;margin-top:5px;line-height:1.5;">${escapeHtml(b.why)}</div>
+                  <div style="font-size:12px;color:#2d7d46;margin-top:4px;font-style:italic;">Pro tip: ${escapeHtml(b.pro_tip)}</div>
                 </div>
               </div>
             </td>
@@ -411,11 +422,11 @@ export default async (req) => {
 
     <div style="background:linear-gradient(135deg,#2d7d46,#3a9b5c);padding:28px 24px;text-align:center;">
       <div style="font-size:12px;color:rgba(255,255,255,0.75);font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px;">Your Scout Type</div>
-      <div style="font-size:26px;font-weight:900;color:#fff;">${results.scout_type || "The Scout"}</div>
+      <div style="font-size:26px;font-weight:900;color:#fff;">${escapeHtml(results.scout_type) || "The Scout"}</div>
     </div>
 
     <div style="padding:20px 24px;background:#fffdf7;border-bottom:1px solid #f0ede4;">
-      <p style="margin:0;font-size:14px;color:#444;line-height:1.7;">${results.personality_description || ""}</p>
+      <p style="margin:0;font-size:14px;color:#444;line-height:1.7;">${escapeHtml(results.personality_description)}</p>
     </div>
 
     <div style="padding:14px 20px 6px;">
@@ -426,7 +437,7 @@ export default async (req) => {
     ${results.eagle_tip ? `
     <div style="margin:16px 20px;padding:14px 16px;background:#fffbee;border-radius:10px;border-left:3px solid #f5b731;">
       <div style="font-size:11px;font-weight:800;color:#d4a020;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">Eagle Tip</div>
-      <div style="font-size:13px;color:#444;line-height:1.6;">${results.eagle_tip}</div>
+      <div style="font-size:13px;color:#444;line-height:1.6;">${escapeHtml(results.eagle_tip)}</div>
     </div>` : ""}
 
     <div style="padding:16px 20px 6px;border-top:1px solid #f0ede4;margin-top:8px;">
