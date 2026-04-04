@@ -277,7 +277,7 @@ export default async (req) => {
   }
 
   try {
-    const { answers, email, excludeBadges, isLoadMore } = await req.json();
+    const { answers, email, excludeBadges, maxPercent, isLoadMore } = await req.json();
 
     if (!validateAnswers(answers)) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
@@ -303,7 +303,7 @@ export default async (req) => {
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: Array.isArray(excludeBadges) && excludeBadges.length
-            ? `${JSON.stringify(answers)}\n\nIMPORTANT: Do NOT recommend any of these badges (already shown to this scout): ${excludeBadges.join(", ")}. Recommend 10 entirely different badges.`
+            ? `${JSON.stringify(answers)}\n\nIMPORTANT: Do NOT recommend any of these badges (already shown to this scout): ${excludeBadges.join(", ")}. Recommend 10 entirely different badges. These are the NEXT best matches, so all match_percent values MUST be lower than ${maxPercent || 75}%. Use the range ${Math.max(50, (maxPercent || 75) - 25)}-${(maxPercent || 75) - 1}%.`
             : JSON.stringify(answers) },
         ],
       }),

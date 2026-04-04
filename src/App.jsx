@@ -539,6 +539,7 @@ function ResultsScreen({ results, onRetake, answers }) {
           answers,
           email: null,
           excludeBadges: results.badges.map(b => b.name),
+          maxPercent: Math.min(...results.badges.map(b => b.match_percent)),
           isLoadMore: true,
         }),
       });
