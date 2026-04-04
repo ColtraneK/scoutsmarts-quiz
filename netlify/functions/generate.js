@@ -2,6 +2,19 @@
 // Proxies the OpenAI API call so the API key stays secret.
 // Set OPENAI_API_KEY in Netlify Environment Variables.
 
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const ALLOWED_ORIGIN = "https://merit-badge-quiz.scoutsmarts.com";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 const SYSTEM_PROMPT = `You are Cole, the founder of ScoutSmarts (scoutsmarts.com), an Eagle Scout who earned the rank in 2014. You are THE expert on all 140 BSA merit badges.
 
 COMPLETE MERIT BADGE DATABASE:
@@ -56,23 +69,31 @@ Respond ONLY with a JSON object (no markdown, no backticks, no preamble):
   "eagle_tip": "1-2 sentences of personalized Eagle advice. No em dashes or en dashes."
 }
 
-Recommend exactly 10 badges sorted by match_percent (75-98). Be opinionated and specific.`;
+Recommend exactly 10 badges sorted by match_percent descending. Each badge MUST have a unique match_percent. Use specific non-round numbers (e.g., 94, 87, 81, 76 — NEVER generic multiples of 5 like 95, 90, 85, 80). Spread them realistically across the 75-97 range based on how strongly each badge actually matches the scout's answers. Be opinionated and specific.`;
 
 export default async (req) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
     });
   }
 
   try {
-    const { answers, email } = await req.json();
+    const body = await req.json();
+    const { answers, email } = body;
 
-    if (!answers || typeof answers !== "object") {
+    if (!answers || typeof answers !== "object" || JSON.stringify(answers).length > 5000) {
       return new Response(JSON.stringify({ error: "Invalid request body" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
+      });
+    }
+
+    if (email && (typeof email !== "string" || email.length > 254 || !EMAIL_RE.test(email))) {
+      return new Response(JSON.stringify({ error: "Invalid email address" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
       });
     }
 
@@ -81,7 +102,7 @@ export default async (req) => {
       console.error("OPENAI_API_KEY not set");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
       });
     }
 
@@ -105,9 +126,9 @@ export default async (req) => {
 
     if (!resp.ok) {
       console.error("OpenAI error:", data);
-      return new Response(JSON.stringify({ error: data.error?.message || "OpenAI error" }), {
-        status: resp.status,
-        headers: { "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "Something went wrong generating your results. Please try again." }), {
+        status: 502,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
       });
     }
 
@@ -154,11 +175,11 @@ export default async (req) => {
         const badgeRows = parsed.badges.map((b, i) => `
           <tr>
             <td style="padding:12px 16px;border-bottom:1px solid #e8e5dc;">
-              <strong style="color:#2c3e1f;font-size:15px;">${i + 1}. ${b.name}</strong>
+              <strong style="color:#2c3e1f;font-size:15px;">${i + 1}. ${escapeHtml(b.name)}</strong>
               ${b.eagle_required ? '<span style="background:#2d7d46;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px;">EAGLE</span>' : ""}
-              <br><span style="color:#7a8b6e;font-size:13px;">${b.match_percent}% match &middot; ${b.category} &middot; ${b.time_estimate}</span>
-              <br><span style="color:#555;font-size:13px;">${b.why}</span>
-              <br><span style="color:#2d7d46;font-size:12px;font-style:italic;">Pro tip: ${b.pro_tip}</span>
+              <br><span style="color:#7a8b6e;font-size:13px;">${parseInt(b.match_percent) || 0}% match &middot; ${escapeHtml(b.category)} &middot; ${escapeHtml(b.time_estimate)}</span>
+              <br><span style="color:#555;font-size:13px;">${escapeHtml(b.why)}</span>
+              <br><span style="color:#2d7d46;font-size:12px;font-style:italic;">Pro tip: ${escapeHtml(b.pro_tip)}</span>
             </td>
           </tr>`).join("");
 
@@ -166,13 +187,13 @@ export default async (req) => {
           <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#f5f3eb;padding:32px 24px;">
             <div style="text-align:center;margin-bottom:24px;">
               <h1 style="color:#2c3e1f;font-size:22px;margin:0;">Your Merit Badge Results</h1>
-              <p style="color:#2d7d46;font-size:18px;margin:8px 0 4px;">${parsed.scout_type || ""}</p>
-              <p style="color:#7a8b6e;font-size:14px;margin:0;">${parsed.personality_description || ""}</p>
+              <p style="color:#2d7d46;font-size:18px;margin:8px 0 4px;">${escapeHtml(parsed.scout_type)}</p>
+              <p style="color:#7a8b6e;font-size:14px;margin:0;">${escapeHtml(parsed.personality_description)}</p>
             </div>
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:10px;overflow:hidden;">
               ${badgeRows}
             </table>
-            ${parsed.eagle_tip ? `<div style="background:#2d7d46;color:#fff;padding:16px;border-radius:8px;margin-top:16px;font-size:13px;"><strong>Eagle Tip:</strong> ${parsed.eagle_tip}</div>` : ""}
+            ${parsed.eagle_tip ? `<div style="background:#2d7d46;color:#fff;padding:16px;border-radius:8px;margin-top:16px;font-size:13px;"><strong>Eagle Tip:</strong> ${escapeHtml(parsed.eagle_tip)}</div>` : ""}
             <p style="text-align:center;color:#b0b0a0;font-size:11px;margin-top:24px;">Sent by <a href="https://scoutsmarts.com" style="color:#2d7d46;">ScoutSmarts</a></p>
           </div>`;
 
@@ -203,14 +224,14 @@ export default async (req) => {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
       },
     });
   } catch (err) {
     console.error("Function error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": ALLOWED_ORIGIN },
     });
   }
 };

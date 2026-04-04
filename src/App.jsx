@@ -54,7 +54,7 @@ Respond ONLY with a JSON object (no markdown, no backticks, no preamble):
   "eagle_tip": "1-2 sentences of personalized Eagle advice. No em dashes or en dashes."
 }
 
-Recommend exactly 10 badges sorted by match_percent (75-98). Be opinionated and specific.`;
+Recommend exactly 10 badges sorted by match_percent descending. Each badge MUST have a unique match_percent. Use specific non-round numbers (e.g., 94, 87, 81, 76 — NEVER generic multiples of 5 like 95, 90, 85, 80). Spread them realistically across the 75-97 range based on how strongly each badge actually matches the scout's answers. Be opinionated and specific.`;
 
 const QUESTIONS = [
   { id: "age", type: "age_range", question: "How old are you?",
